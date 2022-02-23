@@ -31,3 +31,10 @@ vec2 util::complexDivide(vec2 c1, vec2 c2)
 {
 	return complexMultiply(c1, vec2(c2.x, -c2.y)) / dot(c2, c2);
 }
+
+vec2 util::complexPower(vec2 c, double exponent)
+{
+	double r2 = dot(c, c);
+	double theta = exponent * atan2(c.y, c.x);
+	return pow(r2, 0.5 * exponent) * vec2(cos(theta), sin(theta));
+}

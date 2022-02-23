@@ -14,15 +14,6 @@
 using namespace vec;
 using namespace util;
 
-// -2 to 0.5, -1.2 to 1.2
-
-/*
-float c2 = dot(c, c);
-		// skip computation inside M1 - http://iquilezles.org/www/articles/mset_1bulb/mset1bulb.htm
-		if( 256.0*c2*c2 - 96.0*c2 + 32.0*c.x - 3.0 < 0.0 ) return 0.0;
-		// skip computation inside M2 - http://iquilezles.org/www/articles/mset_2bulb/mset2bulb.htm
-		if( 16.0*(c2+2.0*c.x+1.0) - 1.0 < 0.0 ) return 0.0;
-	*/
 
 
 vec2 fragToUv(vec2 fragCoord, vec2 res)
@@ -45,7 +36,7 @@ vec2 uvToFrag(vec2 uv, vec2 res)
 const int defaultResX = 500;
 const int defaultResY = 500;
 const int numThreads = 8;
-const uint64_t trajectoriesPerThread = 800000; // about 11s per 800k trajectories
+const uint64_t trajectoriesPerThread = 80000; // about 11s per 800k trajectories
 const int maxIters[3] = { 150, 1200, 3500 }; // 150 1200 3500
 std::mutex m;
 
@@ -76,29 +67,29 @@ void writeTrajectories(int threadIndex,
 	vec2 resolution,
 	uint64_t* countBuffer,
 	std::default_random_engine engine,
-	std::uniform_real_distribution<double> xDistribution,
-	std::uniform_real_distribution<double> yDistribution)
+	std::uniform_real_distribution<double> scalarDistribution)
 {
 	uint64_t trajectories = 0;
 	while (trajectories < trajectoriesPerThread)
 	{
 		//vec2 C = vec2(xDistribution(engine), yDistribution(engine)); // Mandelbrot
-		/*
+		//*
 		double minR = pow(4.0, -1.0 / 3.0) - pow(4.0, -4.0 / 3.0);
-		double r = 2.4 * (xDistribution(engine)) + minR; // TODO TENDED TOWARD CENTER
-		double theta = twoPi * yDistribution(engine);
+		double r = 2.4 * (scalarDistribution(engine)) + 0.5*minR; // TODO TENDED TOWARD CENTER
+		double theta = twoPi * scalarDistribution(engine);
 		vec2 C = r * vec2(cos(theta), sin(theta));/**/
 		//vec2 z0 = vec2(xDistribution(engine), yDistribution(engine));
 
 		// u(theta) / (k^(1/k-1)) -  u(k*theta) / (k^(k/k-1))
+		/*
 		const double k = 4.0; // todo this will change
-		double boundTheta = twoPi * (xDistribution(engine) - 0.5);
+		double boundTheta = twoPi * (scalarDistribution(engine) - 0.5);
 		vec2 boundary = unit(boundTheta) / pow(k, 1.0 / (k - 1.0))
 			- unit(k * boundTheta) / pow(k, k / (k - 1.0));
 		double boundR = length(boundary);
 		double cTheta = atan2(boundary.y, boundary.x);
-		double cR = boundR + 0.1 * yDistribution(engine);
-		vec2 C = cR * unit(cTheta);
+		double cR = boundR + 0.1 * scalarDistribution(engine);
+		vec2 C = cR * unit(cTheta);/**/
 
 
 		// Skip m1 and m2 - Inigo Quilez
@@ -111,10 +102,12 @@ void writeTrajectories(int threadIndex,
 		std::vector<vec2> points;
 		vec2 z = z0;
 		int iters;
+		const double exponent = 3.5;
 		for (iters = 0; iters < maxIters[0]; iters++)
 		{
-			z = complexSquare(complexSquare(z)) + C;
+			//z = complexSquare(complexSquare(z)) + C;
 			//z = complexMultiply(complexMultiply(complexMultiply(z, z), z), z) + C;
+			z = complexPower(z, exponent) + C;
 			
 			if (dot(z, z) >= 16.0)
 				break;
@@ -128,8 +121,9 @@ void writeTrajectories(int threadIndex,
 		// BLUE
 		for (; iters < maxIters[1]; iters++)
 		{
-			z = complexSquare(complexSquare(z)) + C;
+			//z = complexSquare(complexSquare(z)) + C;
 			//z = complexMultiply(complexMultiply(complexMultiply(z, z), z), z) + C;
+			z = complexPower(z, exponent) + C;
 
 			if (dot(z, z) >= 16.0)
 				break;
@@ -142,8 +136,9 @@ void writeTrajectories(int threadIndex,
 
 		for (; iters < maxIters[2]; iters++)
 		{
-			z = complexSquare(complexSquare(z)) + C;
+			//z = complexSquare(complexSquare(z)) + C;
 			//z = complexMultiply(complexMultiply(complexMultiply(z, z), z), z) + C;
+			z = complexPower(z, exponent) + C;
 
 			if (dot(z, z) >= 16.0)
 				break;
@@ -155,6 +150,7 @@ void writeTrajectories(int threadIndex,
 		}
 		trajectories++;
 
+		// Reporting
 		/*
 		if (threadIndex == 0)
 		{
@@ -250,7 +246,7 @@ void writeMapToFile(vec2 resolution, uint64_t minCounts[], uint64_t maxCounts[],
 	int32_t resY = resolution.y;
 	std::ofstream output;
 	std::cout << "Writing map to file\n";
-	output.open("C:\\Users\\Anthony\\Desktop\\buddhabrot\\buddhabrot.bmap", std::ios::binary);
+	output.open("render\\buddhabrot\\buddhabrot.braw", std::ios::binary);
 	output.write((char*)(&resX), 4);
 	output.write((char*)(&resY), 4);
 	output.write((char*)(minCounts), 8*3);
@@ -265,7 +261,7 @@ void writeMapToFile(vec2 resolution, uint64_t minCounts[], uint64_t maxCounts[],
 uint64_t *readMapFromFile(vec2 &resolution, uint64_t minCounts[], uint64_t maxCounts[])
 {
 	std::ifstream input;
-	input.open("C:\\Users\\Anthony\\Desktop\\buddhabrot\\buddhabrot.bmap", std::ios::binary);
+	input.open("render\\buddhabrot\\buddhabrot.braw", std::ios::binary);
 	if (!input.good())
 	{
 		return nullptr;
@@ -300,7 +296,7 @@ void writeMapToImage(vec2 resolution, uint64_t minCounts[], uint64_t maxCounts[]
 
 	std::cout << "Writing to image\n";
 	std::ofstream output;
-	output.open("C:\\Users\\Anthony\\Desktop\\buddhabrot\\buddhabrot.ppm", std::ios::binary);
+	output.open("render\\buddhabrot\\buddhabrot.ppm", std::ios::binary);
 	output << "P6\n";
 	output << resX << ' ' << resY << '\n';
 	output << "255\n";
@@ -312,26 +308,21 @@ void writeMapToImage(vec2 resolution, uint64_t minCounts[], uint64_t maxCounts[]
 	{
 		for (int x = 0; x < resX; x++)
 		{
-			float intensities[3];
+			vec3 intensity;
 			for (int i = 0; i < 3; i++)
 			{
 				uint64_t count = countBuffer[i + (y * resX + x) * 3];
 				uint64_t relativeCount = count - minCounts[i];
 				uint64_t relativeMax = relativeMaxes[i];
 				double scalar = double(relativeCount + 1) / double(relativeMax + 1);
-				intensities[i] = log(15.0 * scalar) / log(15.0);
-				//intensities[i] = log(relativeCount + 1) / log(relativeMax + 1);
-				//if (i == 0)
-				//	intensities[i] = 1.45 * intensities[i] - 0.45;
-				intensities[i] = std::clamp(intensities[i], 0.0f, 1.0f);
-
-				//intensities[i] = pow(count / maxCount[i], 0.05);
+				intensity[i] = log(15.0 * scalar) / log(15.0);
+				intensity[i] = std::clamp(intensity[i], 0.0, 1.0);
 			}
 			//*
 			vec3 color = 255.0 * vec3(
-				powf(intensities[0], 1.0),  // b //    1, 1.4, 1.8!!! for purple 1, 1, 1.1
-				powf(intensities[1], 1.45),  // r
-				powf(intensities[2], 1.8)); // g /**/
+				pow(intensity[0], 1.0),  // b //    1, 1.4(5?), 1.8!!! for purple, 1, 1.4, 1.8 for blue, 1, 1, 1.1 for default
+				pow(intensity[1], 1.45),  // r
+				pow(intensity[2], 1.8)); // g /**/
 			//vec3 color = 255.0 * vec3(intensities[0], intensities[1], intensities[2]);
 			unsigned char r = (unsigned char)(round(color.x));
 			unsigned char g = (unsigned char)(round(color.y));
@@ -344,17 +335,8 @@ void writeMapToImage(vec2 resolution, uint64_t minCounts[], uint64_t maxCounts[]
 
 
 
-void Buddhabrot::renderBuddhabrot()
+void todoNamespace::renderBuddhabrot()
 {
-	/*vec3 q(0, 1, 2);
-	std::cout << q[0] << '\n';
-	std::cout << q.x << '\n';
-	q[0] = 5;
-	std::cout << q[0] << '\n';
-	std::cout << q.x << '\n';
-	std::cout << q.y << '\n';
-	std::cout << q.z << '\n';*/
-	
 	vec2 resolution;
 	uint64_t minCounts[3] = { 0xFFFFFFFFFFFFFFFF };
 	uint64_t maxCounts[3] = { 0 };
@@ -378,8 +360,7 @@ void Buddhabrot::renderBuddhabrot()
 	std::thread threads[numThreads];
 
 	std::default_random_engine engines[numThreads];
-	std::uniform_real_distribution<double> xDistributions[numThreads];
-	std::uniform_real_distribution<double> yDistributions[numThreads];
+	std::uniform_real_distribution<double> scalarDistributions[numThreads];
 
 	std::cout << numThreads << " threads writing " << trajectoriesPerThread << " trajectories each\n";
 	std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
@@ -387,10 +368,9 @@ void Buddhabrot::renderBuddhabrot()
 	for (int i = 0; i < numThreads; i++)
 	{
 		engines[i] = std::default_random_engine(time(NULL) + i);
-		xDistributions[i] = std::uniform_real_distribution<double>(0.0, 1.0);
-		yDistributions[i] = std::uniform_real_distribution<double>(0.0, 1.0);
+		scalarDistributions[i] = std::uniform_real_distribution<double>(0.0, 1.0);
 		threads[i] = std::thread(writeTrajectories,
-			i, z0, realMix, imaginaryMix, resolution, countBuffer, engines[i], xDistributions[i], yDistributions[i]);
+			i, z0, realMix, imaginaryMix, resolution, countBuffer, engines[i], scalarDistributions[i]);
 	}
 	for (int i = 0; i < numThreads; i++)
 	{

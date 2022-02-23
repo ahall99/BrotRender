@@ -17,4 +17,5 @@ namespace util
 	vec::vec2 complexMultiply(vec::vec2 c1, vec::vec2 c2);
 	vec::vec2 complexSquare(vec::vec2 c);
 	vec::vec2 complexDivide(vec::vec2 c1, vec::vec2 c2);
+	vec::vec2 complexPower(vec::vec2 c, double exponent);
 }

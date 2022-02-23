@@ -36,7 +36,7 @@ int main()
 	//Mandelbrot::renderFromScratch();
 
 
-	Buddhabrot::renderBuddhabrot();
+	todoNamespace::renderBuddhabrot();
 
 
 	return 0;
